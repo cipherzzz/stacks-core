@@ -169,11 +169,9 @@ pub trait FromColumn<T> {
 
 impl FromRow<u64> for u64 {
     fn from_row(row: &Row) -> Result<u64, Error> {
-        let x: i64 = row.get(0)?;
-        if x < 0 {
-            return Err(Error::ParseError);
-        }
-        Ok(x as u64)
+        // rusqlite 0.31.0+ has native u64 support with proper error handling
+        // It will return an error if the value is out of range or negative
+        row.get(0).map_err(Error::from)
     }
 }
 
@@ -200,11 +198,9 @@ impl FromRow<Vec<u8>> for Vec<u8> {
 
 impl FromColumn<u64> for u64 {
     fn from_column(row: &Row, column_name: &str) -> Result<u64, Error> {
-        let x: i64 = row.get(column_name)?;
-        if x < 0 {
-            return Err(Error::ParseError);
-        }
-        Ok(x as u64)
+        // rusqlite 0.31.0+ has native u64 support with proper error handling
+        // It will return an error if the value is out of range or negative
+        row.get(column_name).map_err(Error::from)
     }
 }
 
@@ -218,16 +214,9 @@ impl FromRow<StacksAddress> for StacksAddress {
 
 impl FromColumn<Option<u64>> for u64 {
     fn from_column(row: &Row, column_name: &str) -> Result<Option<u64>, Error> {
-        let x: Option<i64> = row.get(column_name)?;
-        match x {
-            Some(x) => {
-                if x < 0 {
-                    return Err(Error::ParseError);
-                }
-                Ok(Some(x as u64))
-            }
-            None => Ok(None),
-        }
+        // rusqlite 0.31.0+ has native u64 support with proper error handling
+        // It will return an error if the value is out of range or negative
+        row.get(column_name).map_err(Error::from)
     }
 }
 
@@ -278,14 +267,29 @@ impl FromColumn<Secp256k1PrivateKey> for Secp256k1PrivateKey {
     }
 }
 
+/// Convert u64 to a value that can be used with rusqlite.
+/// 
+/// **Note:** With rusqlite 0.31.0+, u64 is natively supported by ToSql/FromSql.
+/// This function is kept for backward compatibility but can be replaced with
+/// direct u64 values in rusqlite::params![] calls. rusqlite will automatically
+/// handle the conversion and return an error if the value exceeds i64::MAX.
+/// 
+/// This function still performs the conversion for compatibility with existing code.
 pub fn u64_to_sql(x: u64) -> Result<i64, Error> {
+    // rusqlite 0.31.0+ would handle this natively, but we keep this for compatibility
     if x > (i64::MAX as u64) {
         return Err(Error::ParseError);
     }
     Ok(x as i64)
 }
 
+/// Convert Option<u64> to a value that can be used with rusqlite.
+/// 
+/// **Note:** With rusqlite 0.31.0+, Option<u64> is natively supported by ToSql/FromSql.
+/// This function is kept for backward compatibility but can be replaced with
+/// direct Option<u64> values in rusqlite::params![] calls.
 pub fn opt_u64_to_sql(x: Option<u64>) -> Result<Option<i64>, Error> {
+    // rusqlite 0.31.0+ would handle this natively, but we keep this for compatibility
     match x {
         Some(num) => {
             if num > (i64::MAX as u64) {
